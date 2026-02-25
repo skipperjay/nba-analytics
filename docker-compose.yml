@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+
+  # ── API ────────────────────────────────────────────────────────────────────
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - ./api:/app/api          # hot-reload your code changes
+      - ./ingestion:/app/ingestion
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # ── Frontend ───────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src  # hot-reload frontend changes
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    restart: unless-stopped
+
+  # ── Local Postgres (optional - use Neon in prod) ───────────────────────────
+  db:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: nba_analytics
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql  # auto-runs on first start
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
