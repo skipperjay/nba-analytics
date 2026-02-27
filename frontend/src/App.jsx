@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import Compare from './Compare.jsx'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, ReferenceLine
@@ -308,7 +309,7 @@ export default function App() {
     pm:  (gameLogs.reduce((s, g) => s + (g.plus_minus || 0), 0) / gameLogs.length).toFixed(1),
   } : null
 
-  const tabs = ['overview', 'charts', 'game log', 'ai insight']
+  const tabs = ['overview', 'charts', 'game log', 'ai insight', 'compare']
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 60px' }}>
@@ -542,6 +543,12 @@ export default function App() {
               {activeTab === 'ai insight' && (
                 <div className="fade-up">
                   <InsightPanel playerId={player.player_id} season={season} playerName={player.full_name} />
+                </div>
+              )}
+
+              {activeTab === 'compare' && (
+                <div className="fade-up">
+                  <Compare season={season} />
                 </div>
               )}
             </>
