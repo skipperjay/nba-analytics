@@ -160,12 +160,19 @@ def ingest_advanced_stats(season: str = SEASON):
     time.sleep(REQUEST_DELAY)
 
     stats = leaguedashplayerstats.LeagueDashPlayerStats(
-        season=season,
-        measure_type_simple_nullable="Advanced",
-    ).get_data_frames()[0]
+    season=season,
+).get_data_frames()[0]
+
+    # Only insert stats for players already in our players table
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT player_id FROM players")
+            existing_ids = {r[0] for r in cur.fetchall()}
 
     rows = []
     for _, row in stats.iterrows():
+        if int(row["PLAYER_ID"]) not in existing_ids:
+            continue
         rows.append((
             int(row["PLAYER_ID"]),
             season,
@@ -259,7 +266,7 @@ def compute_rolling_averages(player_id: int, season: str = SEASON, windows=(5, 1
 
     with get_connection() as conn:
         df = pd.read_sql("""
-            SELECT game_date, pts, reb, ast, plus_minus, fga, ftm, fta, fg3m, fg3a, fgm
+            SELECT DISTINCT ON (game_date) game_date, pts, reb, ast, plus_minus, fga, ftm, fta, fg3m, fg3a, fgm
             FROM player_game_logs
             WHERE player_id = %s AND season = %s
             ORDER BY game_date
@@ -271,22 +278,22 @@ def compute_rolling_averages(player_id: int, season: str = SEASON, windows=(5, 1
     # True shooting %: PTS / (2 * (FGA + 0.44 * FTA))
     df["ts_pct"] = df["pts"] / (2 * (df["fga"] + 0.44 * df["fta"].clip(lower=0.001)))
 
+    numeric_cols = ["pts", "reb", "ast", "ts_pct", "plus_minus"]
     rows = []
     for window in windows:
-        rolled = df.rolling(window, min_periods=1).mean()
+        rolled = df[numeric_cols].rolling(window, min_periods=1).mean()
         for i, (_, row) in enumerate(rolled.iterrows()):
             rows.append((
                 player_id,
                 df.iloc[i]["game_date"],
                 season,
                 window,
-                row["pts"],
-                row["reb"],
-                row["ast"],
-                row["ts_pct"],
-                row["plus_minus"],
+                float(row["pts"]),
+                float(row["reb"]),
+                float(row["ast"]),
+                float(row["ts_pct"]) if not pd.isna(row["ts_pct"]) else None,
+                float(row["plus_minus"]),
             ))
-
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -295,9 +302,16 @@ def compute_rolling_averages(player_id: int, season: str = SEASON, windows=(5, 1
             )
             execute_values(cur, """
                 INSERT INTO player_rolling_averages (
-                    player_id, game_date, season, window,
+                    player_id, game_date, season, window_size,
                     pts_avg, reb_avg, ast_avg, ts_pct_avg, plus_minus_avg
                 ) VALUES %s
+                ON CONFLICT (player_id, game_date, window_size) DO UPDATE SET
+                    pts_avg = EXCLUDED.pts_avg,
+                    reb_avg = EXCLUDED.reb_avg,
+                    ast_avg = EXCLUDED.ast_avg,
+                    ts_pct_avg = EXCLUDED.ts_pct_avg,
+                    plus_minus_avg = EXCLUDED.plus_minus_avg,
+                    season = EXCLUDED.season
             """, rows)
         conn.commit()
     log.info(f"  → {len(rows)} rolling average rows computed")

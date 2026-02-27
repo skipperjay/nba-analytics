@@ -1,0 +1,59 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #080a0f;
+  --surface:   #0e1118;
+  --card:      #131720;
+  --border:    #1e2433;
+  --accent:    #e8ff47;
+  --accent2:   #ff6b35;
+  --text:      #f0f2f5;
+  --muted:     #6b7280;
+  --positive:  #4ade80;
+  --negative:  #f87171;
+  --font-disp: 'Bebas Neue', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.fade-up   { animation: fadeUp 0.4s ease forwards; }
+.fade-up-1 { animation: fadeUp 0.4s 0.05s ease both; }
+.fade-up-2 { animation: fadeUp 0.4s 0.10s ease both; }
+.fade-up-3 { animation: fadeUp 0.4s 0.15s ease both; }
+.fade-up-4 { animation: fadeUp 0.4s 0.20s ease both; }
+.fade-up-5 { animation: fadeUp 0.4s 0.25s ease both; }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--card) 25%, var(--border) 50%, var(--card) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
