@@ -267,7 +267,8 @@ export default function App() {
   const [trends, setTrends]       = useState(null)
   const [loading, setLoading]     = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
-  const [rollWindow, setRollWindow] = useState(10)
+  const [rollWindow, setRollWindow]         = useState(10)
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const searchRef = useRef(null)
   const debounce  = useRef(null)
 
@@ -286,7 +287,10 @@ export default function App() {
     debounce.current = setTimeout(() => searchPlayers(query), 300)
   }, [query, searchPlayers])
 
+  useEffect(() => { setHighlightedIndex(-1) }, [results])
+
   const loadPlayer = async (p) => {
+    clearTimeout(debounce.current)
     setPlayer(p)
     setResults([])
     setQuery(p.full_name)
@@ -345,6 +349,20 @@ export default function App() {
             }}
             onFocus={e => e.target.style.borderColor = 'var(--accent)'}
             onBlur={e => e.target.style.borderColor = 'var(--border)'}
+            onKeyDown={e => {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setHighlightedIndex(i => Math.min(i + 1, results.length - 1))
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setHighlightedIndex(i => Math.max(i - 1, 0))
+              } else if (e.key === 'Enter' && highlightedIndex >= 0) {
+                loadPlayer(results[highlightedIndex])
+              } else if (e.key === 'Escape') {
+                setResults([])
+                setHighlightedIndex(-1)
+              }
+            }}
           />
           {searching && (
             <div style={{ position: 'absolute', right: 18, top: '50%', transform: 'translateY(-50%)', width: 16, height: 16, border: '2px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -361,14 +379,15 @@ export default function App() {
             {results.map((p, i) => (
               <div key={p.player_id}
                 onMouseDown={() => loadPlayer(p)}
+                onMouseEnter={() => setHighlightedIndex(i)}
+                onMouseLeave={() => setHighlightedIndex(-1)}
                 style={{
                   padding: '12px 20px', cursor: 'pointer', display: 'flex',
                   alignItems: 'center', gap: 12,
                   borderBottom: i < results.length - 1 ? '1px solid var(--border)' : 'none',
+                  background: i === highlightedIndex ? 'var(--surface)' : 'transparent',
                   transition: 'background 0.1s',
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
                 <span style={{ fontWeight: 500 }}>{p.full_name}</span>
