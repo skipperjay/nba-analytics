@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Compare from './Compare.jsx'
 import BanterTools from './BanterTools.jsx'
 import Overview from './Overview.jsx'
+import ShotChart from './ShotChart.jsx'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, ReferenceLine
@@ -311,7 +312,7 @@ export default function App() {
     pm:  (gameLogs.reduce((s, g) => s + (g.plus_minus || 0), 0) / gameLogs.length).toFixed(1),
   } : null
 
-  const tabs = ['overview', 'charts', 'game log', 'ai insight', 'compare', 'banter']
+  const tabs = ['overview', 'shot chart', 'charts', 'game log', 'ai insight', 'compare', 'banter']
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 60px' }}>
@@ -431,6 +432,12 @@ export default function App() {
           ) : (
             <>
               {/* OVERVIEW TAB */}
+              {activeTab === 'shot chart' && (
+                <div className="fade-up">
+                  <ShotChart player={player} season={season} />
+                </div>
+              )}
+
               {activeTab === 'overview' && (
                 <Overview
                   player={player}
