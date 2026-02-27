@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Compare from './Compare.jsx'
+import BanterTools from './BanterTools.jsx'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, ReferenceLine
@@ -309,7 +310,7 @@ export default function App() {
     pm:  (gameLogs.reduce((s, g) => s + (g.plus_minus || 0), 0) / gameLogs.length).toFixed(1),
   } : null
 
-  const tabs = ['overview', 'charts', 'game log', 'ai insight', 'compare']
+  const tabs = ['overview', 'charts', 'game log', 'ai insight', 'compare', 'banter']
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 60px' }}>
@@ -549,6 +550,12 @@ export default function App() {
               {activeTab === 'compare' && (
                 <div className="fade-up">
                   <Compare season={season} />
+                </div>
+              )}
+
+              {activeTab === 'banter' && (
+                <div className="fade-up">
+                  <BanterTools />
                 </div>
               )}
             </>
