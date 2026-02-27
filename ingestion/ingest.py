@@ -6,15 +6,15 @@ Install dependencies:
     pip install nba_api psycopg2-binary pandas python-dotenv
 
 Usage:
-    python ingestion/ingest.py --player "Cade Cunningham" --season 2024-25
-    python ingestion/ingest.py --full-refresh --season 2024-25
+    python ingestion/ingest.py --player "Cade Cunningham" --season 2025-26
+    python ingestion/ingest.py --player "Cade Cunningham" --season 2025-26 --shots-only
+    python ingestion/ingest.py --full-refresh --season 2025-26
+    python ingestion/ingest.py --teams-players --season 2025-26
 """
 
 import time
 import argparse
 import logging
-from datetime import datetime
-
 import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values
@@ -23,9 +23,7 @@ import os
 
 from nba_api.stats.endpoints import (
     playergamelogs,
-    playerdashboardbyyearoveryear,
     shotchartdetail,
-    commonplayerinfo,
     leaguedashplayerstats,
 )
 from nba_api.stats.static import players, teams
@@ -36,9 +34,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger(__name__)
 
 DB_URL = os.getenv("DATABASE_URL", "postgresql://localhost/nba_analytics")
-SEASON = "2024-25"
-# nba_api rate limit — be respectful
-REQUEST_DELAY = 0.6  
+SEASON = "2025-26"
+REQUEST_DELAY = 0.6
 
 
 def get_connection():
@@ -52,10 +49,7 @@ def get_connection():
 def ingest_teams():
     log.info("Ingesting teams...")
     all_teams = teams.get_teams()
-    rows = [
-        (t["id"], t["full_name"], t["abbreviation"], t["city"], t["state"], None, None)
-        for t in all_teams
-    ]
+    rows = [(t["id"], t["full_name"], t["abbreviation"], t["city"], None, None) for t in all_teams]
     with get_connection() as conn:
         with conn.cursor() as cur:
             execute_values(cur, """
@@ -64,7 +58,7 @@ def ingest_teams():
                 ON CONFLICT (team_id) DO UPDATE SET
                     full_name = EXCLUDED.full_name,
                     abbr = EXCLUDED.abbr
-            """, [(r[0], r[1], r[2], r[3], r[5], r[6]) for r in rows])
+            """, rows)
         conn.commit()
     log.info(f"  → {len(rows)} teams upserted")
 
@@ -72,10 +66,7 @@ def ingest_teams():
 def ingest_players(active_only=True):
     log.info("Ingesting players...")
     all_players = players.get_active_players() if active_only else players.get_players()
-    rows = []
-    for p in all_players:
-        rows.append((p["id"], p["full_name"], None, None, None, None, True))
-
+    rows = [(p["id"], p["full_name"], None, None, None, None, True) for p in all_players]
     with get_connection() as conn:
         with conn.cursor() as cur:
             execute_values(cur, """
@@ -111,7 +102,7 @@ def ingest_game_logs(player_id: int, season: str = SEASON):
         rows.append((
             player_id,
             row["GAME_ID"],
-            row["GAME_DATE"][:10],  # truncate to date
+            row["GAME_DATE"][:10],
             season,
             row.get("MATCHUP"),
             row.get("WL"),
@@ -160,8 +151,8 @@ def ingest_advanced_stats(season: str = SEASON):
     time.sleep(REQUEST_DELAY)
 
     stats = leaguedashplayerstats.LeagueDashPlayerStats(
-    season=season,
-).get_data_frames()[0]
+        season=season,
+    ).get_data_frames()[0]
 
     # Only insert stats for players already in our players table
     with get_connection() as conn:
@@ -177,11 +168,11 @@ def ingest_advanced_stats(season: str = SEASON):
             int(row["PLAYER_ID"]),
             season,
             row.get("GP"),
-            row.get("PIE"),        # nba_api uses PIE, similar to PER
+            row.get("PIE"),
             row.get("TS_PCT"),
             row.get("USG_PCT"),
-            None,                  # BPM not in this endpoint
-            None,                  # VORP not in this endpoint
+            None,
+            None,
             row.get("AST_PCT"),
             row.get("REB_PCT"),
             row.get("TM_TOV_PCT"),
@@ -205,7 +196,7 @@ def ingest_advanced_stats(season: str = SEASON):
 
 
 # ---------------------------------------------------------------------------
-# Shot Charts
+# Shot Charts — FIXED: bool(int()) conversion for SHOT_MADE_FLAG
 # ---------------------------------------------------------------------------
 
 def ingest_shot_chart(player_id: int, season: str = SEASON):
@@ -234,14 +225,13 @@ def ingest_shot_chart(player_id: int, season: str = SEASON):
             row.get("SHOT_DISTANCE"),
             row.get("LOC_X"),
             row.get("LOC_Y"),
-            row.get("SHOT_MADE_FLAG") == 1,
+            bool(int(row.get("SHOT_MADE_FLAG", 0))),  # ← FIXED
             row.get("SHOT_TYPE"),
             row.get("ACTION_TYPE"),
         ))
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            # Delete existing and reinsert (shot charts don't have a clean unique key)
             cur.execute(
                 "DELETE FROM shot_chart WHERE player_id = %s AND season = %s",
                 (player_id, season)
@@ -266,7 +256,7 @@ def compute_rolling_averages(player_id: int, season: str = SEASON, windows=(5, 1
 
     with get_connection() as conn:
         df = pd.read_sql("""
-            SELECT DISTINCT ON (game_date) game_date, pts, reb, ast, plus_minus, fga, ftm, fta, fg3m, fg3a, fgm
+            SELECT game_date, pts, reb, ast, plus_minus, fga, ftm, fta, fg3m, fg3a, fgm
             FROM player_game_logs
             WHERE player_id = %s AND season = %s
             ORDER BY game_date
@@ -275,7 +265,6 @@ def compute_rolling_averages(player_id: int, season: str = SEASON, windows=(5, 1
     if df.empty:
         return
 
-    # True shooting %: PTS / (2 * (FGA + 0.44 * FTA))
     df["ts_pct"] = df["pts"] / (2 * (df["fga"] + 0.44 * df["fta"].clip(lower=0.001)))
 
     numeric_cols = ["pts", "reb", "ast", "ts_pct", "plus_minus"]
@@ -294,6 +283,7 @@ def compute_rolling_averages(player_id: int, season: str = SEASON, windows=(5, 1
                 float(row["ts_pct"]) if not pd.isna(row["ts_pct"]) else None,
                 float(row["plus_minus"]),
             ))
+
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -305,13 +295,7 @@ def compute_rolling_averages(player_id: int, season: str = SEASON, windows=(5, 1
                     player_id, game_date, season, window_size,
                     pts_avg, reb_avg, ast_avg, ts_pct_avg, plus_minus_avg
                 ) VALUES %s
-                ON CONFLICT (player_id, game_date, window_size) DO UPDATE SET
-                    pts_avg = EXCLUDED.pts_avg,
-                    reb_avg = EXCLUDED.reb_avg,
-                    ast_avg = EXCLUDED.ast_avg,
-                    ts_pct_avg = EXCLUDED.ts_pct_avg,
-                    plus_minus_avg = EXCLUDED.plus_minus_avg,
-                    season = EXCLUDED.season
+                ON CONFLICT (player_id, game_date, window_size) DO NOTHING
             """, rows)
         conn.commit()
     log.info(f"  → {len(rows)} rolling average rows computed")
@@ -321,8 +305,11 @@ def compute_rolling_averages(player_id: int, season: str = SEASON, windows=(5, 1
 # Full player pipeline
 # ---------------------------------------------------------------------------
 
-def ingest_player(name: str, season: str = SEASON):
+def ingest_player(name: str, season: str = SEASON, shots_only: bool = False):
     matched = [p for p in players.get_active_players() if name.lower() in p["full_name"].lower()]
+    if not matched:
+        # Try all players (including historical) if not found in active
+        matched = [p for p in players.get_players() if name.lower() in p["full_name"].lower()]
     if not matched:
         log.error(f"Player '{name}' not found")
         return
@@ -331,11 +318,16 @@ def ingest_player(name: str, season: str = SEASON):
 
     player = matched[0]
     pid = player["id"]
-    log.info(f"Ingesting {player['full_name']} (id={pid})")
+    log.info(f"Ingesting {player['full_name']} (id={pid}) shots_only={shots_only}")
 
-    ingest_game_logs(pid, season)
+    if not shots_only:
+        ingest_game_logs(pid, season)
+
     ingest_shot_chart(pid, season)
-    compute_rolling_averages(pid, season)
+
+    if not shots_only:
+        compute_rolling_averages(pid, season)
+
     log.info(f"Done ingesting {player['full_name']}")
 
 
@@ -347,6 +339,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="NBA Analytics Ingestion")
     parser.add_argument("--player", type=str, help="Player name to ingest")
     parser.add_argument("--season", type=str, default=SEASON)
+    parser.add_argument("--shots-only", action="store_true", help="Only re-ingest shot charts (skips game logs and rolling averages)")
     parser.add_argument("--full-refresh", action="store_true", help="Ingest all active players")
     parser.add_argument("--teams-players", action="store_true", help="Seed teams and players tables")
     args = parser.parse_args()
@@ -357,7 +350,7 @@ if __name__ == "__main__":
         ingest_advanced_stats(args.season)
 
     elif args.player:
-        ingest_player(args.player, args.season)
+        ingest_player(args.player, args.season, shots_only=args.shots_only)
 
     elif args.full_refresh:
         ingest_teams()
@@ -366,9 +359,7 @@ if __name__ == "__main__":
         all_players = players.get_active_players()
         for p in all_players:
             try:
-                ingest_game_logs(p["id"], args.season)
-                ingest_shot_chart(p["id"], args.season)
-                compute_rolling_averages(p["id"], args.season)
+                ingest_player(p["full_name"], args.season, shots_only=args.shots_only)
             except Exception as e:
                 log.error(f"Failed on {p['full_name']}: {e}")
 

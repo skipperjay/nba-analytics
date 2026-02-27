@@ -1,15 +1,15 @@
 """
 Bulk ingestion script — ingests all active NBA players across specified seasons.
 Usage:
-    python ingest_bulk.py                        # all active players, current season
-    python ingest_bulk.py --seasons 2025-26 2024-25 2023-24   # multiple seasons
-    python ingest_bulk.py --all-seasons          # last 25 seasons (long!)
+    python ingest_bulk.py                                    # current season, all players
+    python ingest_bulk.py --seasons 2024-25 2023-24          # multiple seasons
+    python ingest_bulk.py --seasons 2025-26 --shots-only     # re-ingest shot charts only
+    python ingest_bulk.py --all-seasons                      # last 25 seasons
 """
 
 import subprocess
 import sys
 import argparse
-import time
 from nba_api.stats.static import players
 
 ALL_SEASONS = [
@@ -20,39 +20,40 @@ ALL_SEASONS = [
     "2005-06", "2004-05", "2003-04", "2002-03", "2001-02",
 ]
 
-def run(player, season):
-    result = subprocess.run(
-        [sys.executable, "ingestion/ingest.py", "--player", player, "--season", season],
-        capture_output=False,
-    )
+def run(player, season, shots_only=False):
+    cmd = [sys.executable, "ingestion/ingest.py", "--player", player, "--season", season]
+    if shots_only:
+        cmd.append("--shots-only")
+    result = subprocess.run(cmd, capture_output=False)
     return result.returncode == 0
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--seasons", nargs="+", default=["2025-26"])
     parser.add_argument("--all-seasons", action="store_true")
-    parser.add_argument("--active-only", action="store_true", default=True)
+    parser.add_argument("--shots-only", action="store_true")
     args = parser.parse_args()
 
     seasons = ALL_SEASONS if args.all_seasons else args.seasons
 
-    print("Fetching player list from nba_api...")
-    all_players = players.get_active_players() if args.active_only else players.get_players()
+    print("Fetching player list...")
+    all_players = players.get_active_players()
     player_names = [p["full_name"] for p in all_players]
     print(f"Found {len(player_names)} players")
+
+    if args.shots_only:
+        print("MODE: shots only — skipping game logs and rolling averages")
 
     total = len(player_names) * len(seasons)
     done = 0
     failed = []
 
     for season in seasons:
-        print(f"\n{'='*50}")
-        print(f"  Season: {season}  ({len(player_names)} players)")
-        print(f"{'='*50}")
+        print(f"\n{'='*50}\n  Season: {season}\n{'='*50}")
         for player in player_names:
             done += 1
             print(f"\n[{done}/{total}] {player} — {season}")
-            ok = run(player, season)
+            ok = run(player, season, shots_only=args.shots_only)
             if not ok:
                 failed.append(f"{player} ({season})")
 
