@@ -4,7 +4,7 @@ import {
   ResponsiveContainer, CartesianGrid, ReferenceLine
 } from 'recharts'
 
-const API = '/api'
+const API = import.meta.env.VITE_API_URL || ''
 
 async function apiFetch(path, opts = {}) {
   const res = await fetch(`${API}${path}`, opts)
