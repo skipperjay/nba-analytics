@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Compare from './Compare.jsx'
 import BanterTools from './BanterTools.jsx'
+import Overview from './Overview.jsx'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, ReferenceLine
@@ -430,33 +431,14 @@ export default function App() {
           ) : (
             <>
               {/* OVERVIEW TAB */}
-              {activeTab === 'overview' && seasonAvg && (
-                <div className="fade-up">
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, marginBottom: 32 }}>
-                    <StatCard label="Points" value={seasonAvg.pts} delta={trends?.pts_delta} className="fade-up-1" />
-                    <StatCard label="Rebounds" value={seasonAvg.reb} delta={trends?.reb_delta} className="fade-up-2" />
-                    <StatCard label="Assists" value={seasonAvg.ast} delta={trends?.ast_delta} className="fade-up-3" />
-                    <StatCard label="Plus / Minus" value={seasonAvg.pm} delta={trends?.plus_minus_delta} className="fade-up-4" />
-                  </div>
-
-                  {/* Mini chart preview */}
-                  {rolling.length > 0 && (
-                    <div className="fade-up-5" style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginBottom: 16, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                        {rollWindow}-Game Rolling Average — Points
-                      </div>
-                      <ResponsiveContainer width="100%" height={200}>
-                        <LineChart data={rolling}>
-                          <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-                          <XAxis dataKey="game_date" tick={{ fontSize: 10, fill: 'var(--muted)', fontFamily: 'var(--font-mono)' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                          <YAxis tick={{ fontSize: 10, fill: 'var(--muted)', fontFamily: 'var(--font-mono)' }} tickLine={false} axisLine={false} />
-                          <Tooltip content={<ChartTooltip />} />
-                          <Line type="monotone" dataKey="pts_avg" name="PPG" stroke="var(--accent)" strokeWidth={2} dot={false} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </div>
+              {activeTab === 'overview' && (
+                <Overview
+                  player={player}
+                  season={season}
+                  gameLogs={gameLogs}
+                  rolling={rolling}
+                  trends={trends}
+                />
               )}
 
               {/* CHARTS TAB */}
