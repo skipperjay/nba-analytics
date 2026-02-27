@@ -304,8 +304,7 @@ Respond with a JSON object:
   "keywords": ["3-4 short YouTube search phrases reflecting key themes, e.g. mid range improvement"]
 }}
 
-Return only valid JSON, no markdown.
-"""
+CRITICAL: Return ONLY a raw JSON object. No markdown, no code blocks, no explanatory text before or after. Just the JSON object starting with { and ending with }."""
 
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     message = client.messages.create(
