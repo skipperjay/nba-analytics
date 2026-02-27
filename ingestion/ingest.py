@@ -208,6 +208,7 @@ def ingest_shot_chart(player_id: int, season: str = SEASON):
         player_id=player_id,
         season_nullable=season,
         season_type_all_star="Regular Season",
+        context_measure_simple="FGA",
     ).get_data_frames()[0]
 
     if shots.empty:
