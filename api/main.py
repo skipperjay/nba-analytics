@@ -73,7 +73,7 @@ def get_rolling_averages(player_id: int, season: str = "2024-25", window: int = 
             cur.execute("""
                 SELECT game_date, pts_avg, reb_avg, ast_avg, ts_pct_avg, plus_minus_avg
                 FROM player_rolling_averages
-                WHERE player_id = %s AND season = %s AND window = %s
+                WHERE player_id = %s AND season = %s AND window_size = %s
                 ORDER BY game_date ASC
             """, (player_id, season, window))
             return cur.fetchall()
