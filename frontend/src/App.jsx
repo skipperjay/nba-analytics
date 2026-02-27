@@ -360,7 +360,7 @@ export default function App() {
           }}>
             {results.map((p, i) => (
               <div key={p.player_id}
-                onClick={() => loadPlayer(p)}
+                onMouseDown={() => loadPlayer(p)}
                 style={{
                   padding: '12px 20px', cursor: 'pointer', display: 'flex',
                   alignItems: 'center', gap: 12,

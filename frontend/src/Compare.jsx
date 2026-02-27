@@ -69,7 +69,7 @@ function PlayerSearch({ label, color, onSelect, selected }) {
         }}>
           {results.map((p, i) => (
             <div key={p.player_id}
-              onClick={() => { onSelect(p); setQuery(p.full_name); setResults([]) }}
+              onMouseDown={() => { onSelect(p); setQuery(p.full_name); setResults([]) }}
               style={{
                 padding: '10px 16px', cursor: 'pointer',
                 borderBottom: i < results.length - 1 ? '1px solid var(--border)' : 'none',
